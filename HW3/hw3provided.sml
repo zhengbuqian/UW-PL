@@ -9,11 +9,12 @@ fun longest_string1 xs =
 fun longest_string2 xs =
     List.foldl (fn (x, y) => if (String.size x) >= (String.size y) then x else y) "" xs
 
-fun longest_string_helper f xs =
-    List.foldl f "" xs
-
-val longest_string3 = longest_string_helper (fn (x,y) => if (String.size x) > (String.size y) then x else y)
-val longest_string4 = longest_string_helper (fn (x,y) => if (String.size x) >= (String.size y) then x else y)
+fun longest_string_helper f = 
+    List.foldl (fn (s,sofar) => if f(String.size s,String.size sofar)
+				                        then s
+				                        else sofar) ""
+val longest_string3 = longest_string_helper (fn (x,y) => x > y) 
+val longest_string4 = longest_string_helper (fn (x,y) => x >= y)
 
 val longest_capitalized = longest_string1 o only_capitals
 
@@ -22,11 +23,11 @@ val rev_string = String.implode o List.rev o String.explode
 exception NoAnswer
 
 fun first_answer f xs =
-    case (List.filter (fn x => case (f x) of NONE => false | SOME v => true) xs ) of
+    case xs of
     [] => raise NoAnswer
-    | x::_ => case f x of
-            SOME v => v
-            | _ => raise NoAnswer
+    | x::xs' => case f x of 
+                NONE => first_answer f xs'
+                | SOME y => y
 
 fun all_answers f xs =  (* f: 'a -> 'b list option *)
     case xs of
@@ -81,7 +82,8 @@ fun check_pat p =
     in
         (check_no_duplicate o all_string) p
     end
-fun match (v, p) =
+(* apply pattern match to pair is more elegant *)
+(*fun match (v, p) =
     case p of
     Wildcard => SOME []
     | Variable s => SOME [(s, v)]
@@ -100,7 +102,19 @@ fun match (v, p) =
                             all_answers (fn x => case x of (pattern, value) => match(value, pattern)
                             ) (ListPair.zip(ps, vs))
                         else NONE
-            | _ => NONE)
+            | _ => NONE)*)
+fun match (v, p) =
+    case (v, p) of
+    (_, Wildcard) => SOME []
+    | (_, Variable s) => SOME [(s, v)]
+    | (Unit, UnitP) => SOME []
+    | (Const va, ConstP pa) => if va = pa then SOME [] else NONE
+    | (Tuple(vs), TupleP(ps)) => if length vs = length ps
+                                 then all_answers match (ListPair.zip(vs, ps))
+                                 else NONE
+    | (Constructor(s1, v), ConstructorP(s2, p)) => if s1 <> s2 then NONE
+                                                   else match(v,p)
+    | _ => NONE
     
 fun first_match v ps =
     SOME (first_answer (fn p => match(v,p)) ps)
